@@ -1,17 +1,32 @@
-- title: Student, Harvard CS
-  from: 2014
-  to: 2018
-  description: Lorem ipsum dolor sit amet, consectetur adipiscing elit,
-               sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
-               Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris
-               nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in
-               reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur.
-
-- title: Software Engineer, Google, UK
-  from: 2018
+- title: Cloud Support Engineer II / <strong style="color:#007bff;">Amazon Web Services</strong>
+  from: 2021
   to: present
-  description: Lorem ipsum dolor sit amet, consectetur adipiscing elit,
-               sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
-               Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris
-               nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in
-               reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur.
+  description: At AWS I provide advanced remote technical support to customers by responding to difficult technical inqueries related to production issues to propose solutions regarding
+    cloud networking and or system issues. I apply advanced troubleshooting techniques to provide tailored solutions for our customers
+    and drive customer interactions by thoughtfully working with customers to dive deep into the root cause of an issue.
+
+- title: Lead Store Network Engineer / <strong style="color:#007bff;">7-Eleven</strong>
+  from: 2020
+  to: 2021
+  description: After 7-Eleven solicited GDT, I transitioned to full time employement which we all agreed upon. At 7-Eleven I was focused on store networks which were primarily Juniper based.
+    I continued to execute the projects assigned to me as well as day to day operations of 20,000 Network Devices.
+
+- title: Network Engineer / General Data Tech, <strong style="color:#007bff;">Contracted to 7-Eleven</strong>
+  from: 2019
+  to: 2020
+  description: At GDT I was utilized in their NOC to monitor and maintain the network for several of their clients. I was originally brought into 7-Eleven as a temporary contractor
+    to help with GDT's professional services department, I continued performing work for both the NOC team and 7-Eleven but eventually transitioned to fulltime work at 7-Eleven.
+
+- title: Network Technician / <strong style="color:#007bff;">Tekzenit, Inc.</strong>
+  from: 2018
+  to: 2019
+  description: At Tekzenit I supported the network for 40+ small business customers ranging from auto shops, car dealerships, dentral offices and warehouses. I was the dedicated
+    Network specalist for the MSP. The MSP was heavily involved in using WatchGuard Firewalls so I became certified so we could be considered a Silver Resell Partner.
+
+- title: Enterprise Support Team Lead / <strong style="color:#007bff;">Telvista</strong>
+  from: 2015
+  to: 2018
+  description: At Telvista I was contracted to perform work for Verizon. This was a NOC environment that was used to field calls from their Fiber Field Technicians.
+   I provided product support to field technicians via phone for business class wireline service. I also worked to correct port assignments for the fiber plant in the provisioning system, 
+   corrected network configuration issues involving IP connectivity such as Static IP information, DHCP configuration PPPoE and Radius interactions, 
+   and corrected S-Tag & C-Tag assignments used in Q-in-Q backbone tunneling. 
