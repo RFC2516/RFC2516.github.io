@@ -17,7 +17,7 @@ I am a passionate self-taught Network Engineer that lives in Dallas, Texas. Plea
 
 <div data-iframe-width="150" data-iframe-height="270" data-share-badge-id="d0f92b42-72ab-4fc7-89d3-f34ece43a469" data-share-badge-host="https://www.credly.com"></div><script type="text/javascript" async src="//cdn.credly.com/assets/utilities/embed.js"></script>
 
-<div data-iframe-width="150" data-iframe-height="270" data-share-badge-id="97e40c3a-883f-4bfd-8a27-0647bfab716f" data-share-badge-host="https://www.credly.com"></div><script type="text/javascript" async src="//cdn.credly.com/assets/utilities/embed.js" allowTransparency="false"></script>
+<div data-iframe-width="150" data-iframe-height="270" data-share-badge-id="97e40c3a-883f-4bfd-8a27-0647bfab716f" data-share-badge-host="https://www.credly.com"></div><script type="text/javascript" async src="//cdn.credly.com/assets/utilities/embed.js"></script>
 
 <!---
  <div class="row">
