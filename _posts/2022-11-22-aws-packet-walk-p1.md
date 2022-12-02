@@ -3,7 +3,7 @@ title: Part 1 -  Packet Walking in AWS
 tags: [Networking, AWS]
 style: fill
 color: primary
-description: Performing a packet walk can be the most important step to troubleshooting a network issue. This guide explains how to walk through the AWS Network topology.
+description: Performing a packet walk can be the most important step to troubleshooting a network issue. This post talks about the terminology and theory.
 ---
 
 # Preamble
