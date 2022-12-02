@@ -45,6 +45,7 @@ except KeyboardInterrupt:
     serversocket.close()
 ```
 
+The SO_KEEPALIVE option is disabled by default on Linux because the TCP keepalive mechanism can consume additional resources on both the client and server, such as network bandwidth and CPU time. In many cases, a TCP connection will be terminated by the application before the keepalive mechanism is needed, so enabling the option by default would add unnecessary overhead. Additionally, some applications may not be designed to handle the keepalive mechanism, and enabling the option could cause unexpected behavior. For these reasons, the SO_KEEPALIVE option is disabled by default, and it is up to the user or application to enable it if needed.
 
 
 <!---
