@@ -1,5 +1,5 @@
 ---
-title: Part 2 -  Packet Walking in AWS
+title: Packet Walking in AWS - Part 2
 tags: [Networking, AWS]
 style: fill
 color: primary
