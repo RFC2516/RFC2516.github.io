@@ -1,11 +1,11 @@
 ---
 name: This Blog!
 tools: [Development]
-image: /media/2022-11-22-this-blog.jpg
+image: /media/2022-11-22/this-blog.jpg
 description: Want to know how I created this blog? Check out the Theme Repository!
 ---
 
-<img src="/media/2022-11-22-this-blog.jpg">
+<img src="/media/2022-11-22/this-blog.jpg">
 
 Photo by <a href="https://unsplash.com/@fredasem?utm_source=unsplash&utm_medium=referral&utm_content=creditCopyText">Freddy Kearney</a> on <a href="https://unsplash.com/s/photos/adventure-begins?utm_source=unsplash&utm_medium=referral&utm_content=creditCopyText">Unsplash</a>
   

@@ -28,29 +28,49 @@ In this post we are going to explore an AWS Networking Scenario in which an EC2 
 6. update template
 
 1. locate the subnet of the ENI
-2. check the security group / network acl
+2. check the security group / network acl (outgoing)
 3. check the route table, target is tgw
 4. what availability zone are we in?
 5. locate the transit gateway attachment ENI in the same availabilty zone
-6. locate the network acl of the tgw attachment eni subnet
+6. locate the network acl (incoming & outgoing) of the vpc-a tgw attachment eni subnet
 7. update template
 
-talk about transit gateway az affinity
+talk about transit gateway az affinity and it's intent based routing behavior
 
-1. locate the tgw route table
+1. locate the tgw route table based on what the source resource is using.
 2. what attachment / resource do we end up at?
-3. locate the eni of the attachment in the same az (az affinity reminder)
-4. update the template
+3. locate the eni of the vpc-b attachment in the same az (az affinity reminder)
+4. check the security group / networkacl (incoming & outgoing)
+5 update the template
 
-5. locate the route table of the ENI
-6. check the network acl of the ENI's subnet
-7. check the ENI's route table, target is local
-8. explain local
-9. check network acl of subnet for target ec2
-10. check security group of ENI for EC2
-11. update the template
+1. locate the route table of the ENI
+2. check the ENI's route table, target is local
+3. explain local
+4. check network acl (incoming) of subnet for target ec2
+5. check security group of ENI for EC2
+6. update the template
+7. This completes our forward path
 
+--
 
+starting our return path
+
+1. locate the ec2 server
+2. locate it's eni
+3. check it's route table
+4. check security group and network acl (outgoing)
+5. update template.
+
+1. locate the ENI of the TGW Attachment in the same AZ
+2. check the route table for the ENI of the TGW Attachment in the same AZ 
+3. Check the security group / network acl (incoming & outgoing)
+
+1. Review the TGW's RT
+2. Locate the ENI of the TGW Attachment in the same AZ
+3. Review Network ACL (outgoing)
+
+1. Locate the ENI of the source EC2
+2. Review the network acl (incoming)
 
 # Thanks
 
