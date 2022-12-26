@@ -39,7 +39,7 @@ AWS enforces this limitation on their gateways by reviewing the source and desti
 
 The Local Route is an intent based route that is limited to the same VPC that the route table exists in. By default your route tables will send all traffic for your VPC's CIDR to the Local Route.
 
-{% include elements/figure.html image="/media/2022-11-22/local-gw-flow.svg" caption="Internet Gateway packet flow logic" %}
+{% include elements/figure.html image="/media/2022-11-22/local-gw-flow.svg" caption="Local packet flow logic" %}
 
 ### NAT Gateway
 

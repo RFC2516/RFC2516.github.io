@@ -10,273 +10,343 @@ description: This post explains how to walk through an VPC to VPC Connectivity s
 
 # Preamble
 
-In this post we are going to explore an AWS Networking Scenario in which an EC2 Instance in a VPC communicate with another EC2 Instance in a different VPC. Again you've been tagged as the individual responsible for troubleshooting this and you need to apply your Packet Walking skills to understand what, if anything, could be at fault. Below we will first analyize the forward path, stopping at any major decision points and asking ourselfs if the packet will be forwarded or discarded at any point. We will then do the same for the return path. We will use the theory from part 1 to help in this analysis.
+In this post we are going to explore an AWS Networking Scenario in which an EC2 Instance in a VPC needs to communicate with another EC2 Instance in a different VPC. You've been tagged as the individual responsible for troubleshooting this and you need to apply your Packet Walking skills to understand what, if anything, could be at fault. Below we will first analyize the forward path, stopping at any major decision points and asking ourselfs if the packet will be forwarded or discarded at any point. We will then do the same for the return path. We will use the theory from part 1 to help in this analysis.
 
 # Architecture
 
-To begin your packet walking you need to identify the source IP, destination IP, source port, destination port and protocol. In this example we want to connect from HOST-A to HOST-B with just an ICMP Ping.
+To begin your packet walking you need to identify the source IP, destination IP, source port, destination port and protocol. Take some time to become familiar with the architecture. Consider right clicking and opening the image in a new tab to see it at maximum resolution.
 
-> Source IP: 10.0.142.154 <br/>
-> Source Port: ICMP <br/>
-> Destination IP: 8.8.8.8 <br/>
-> Destination Port: ICMP <br/>
+Our architecture looks as such:
 
-Our diagram looks as such:
+{% include elements/figure.html image="/media/2022-12-15/p3-architecture.svg" caption="Network Diagram" %}
 
-<!---
+While the scenario may not involve any actual problems, your goal while reading this post should be to practice your packet walking skill. This skill is absolutely necessary for anyone in charge of any networking configuration in AWS. You can think of this as doing your stretches before a big problem.
 
-<img of vpc to tgw to vpc architecture>
-
---->
-
-While the scenario may not involve any actual problems, the goal of this post is to practice the packet walking skill. This skill is absolutely necessary for anyone in charge of any networking configuration in AWS. You can think of this as doing your stretches before a big problem.
+In this example we want to connect from HOST-A to HOST-B's HTTP Service. Let's start:
 
 ## Performing our Packet Walk
 
 A packet walk involves tracing each hop of the network connectivity and taking note. To do this you could picture in your mind what is happening to the packet as well as the devices that exist at each hop. For now, while you're practicing I recommend writing notes similar to below.
 
-> == Packet Path ==
-> Forward: ?
->
-> == Packet Headers ==
-> Source:
-> Source Port: 
-> Destination: 
-> Destination Port:
+> == Packet Path == <br/>
+> Forward: ? <br/>
+> <br/>
+> == Packet Headers == <br/>
+> Source: 10.0.9.132<br/>
+> Source Port: Ephemeral  <br/>
+> Destination: 10.1.8.131  <br/>
+> Destination Port: 443/tcp <br/>
 
-Let's start by locate the HOST-A EC2 Instance in the console.
+Let's start by locate the HOST-A's Instance ID in the console and clicking it.
 
-<locate-ec2-host-a>
+{% include elements/figure.html image="/media/2022-12-15/locate-ec2-host-a.png" caption="HOST-A" %}
 
-Click on the EC2 Instance ID and then scroll down, open the "Networking Tab" and then open the click the ENI ID Link.
+Click on HOST-A's Instance ID and then scroll down, open the "Networking Tab" and then open the click the ENI ID Link.
 
-Forward: eni-084d826e4b1e0e190 (HOST-A-VPC-A-1B)
+{% include elements/figure.html image="/media/2022-12-15/host-a-networking-page.png" caption="HOST-A's Networking Page" %}
 
-<host-a-networking-page>
+This ENI represents the first hop for our packet. Let's click on the ENI ID and then open both the Subnet ID and the Security Group links on the next page. Additionally now that we know the first hop let's record it in our packet walking notes.
 
-On the ENI page open both the Subnet ID and the Security Group links.
+> == Packet Path == <br/>
+> Forward: **eni-084d826e4b1e0e190** -> ? <br/>
+> <br/>
+> == Packet Headers == <br/>
+> Source: 10.0.9.132<br/>
+> Source Port: Ephemeral  <br/>
+> Destination: 10.1.8.131  <br/>
+> Destination Port: 443/tcp <br/>
 
-<host-a-eni-page>
+On the next page we see,
 
-Check the security group to ensure we have an Outbound Rule which allows this traffic.
+{% include elements/figure.html image="/media/2022-12-15/host-a-eni-page.png" caption="HOST-A's ENI Page" %}
 
-<host-a-security-group-outbound>
+Open both the subnet and the security group. First check the security group for an Outbound Rule which allows this traffic. Since the destination of the traffic is "10.1.8.131" this matches the outbound rule for "0.0.0.0/0" for all protocols. Therefore the traffic is allowed outbound.
+
+{% include elements/figure.html image="/media/2022-12-15/host-a-sg-outbound.png" caption="HOST-A's Security Group Outbound" %}
 
 Check the subnet's route table to see where the next hop is.
 
-<host-a-subnet-route-table>
+{% include elements/figure.html image="/media/2022-12-15/host-a-subnet-route-table.png" caption="HOST-A's Route Table" %}
 
-Since this is leaving the subnet, check the Network ACL's outbound rules
+Let's look back at our packet walking notes.
 
-<host-a-subnet-nacl-outbound>
+> == Packet Path == <br/>
+> Forward: eni-084d826e4b1e0e190 -> ? <br/>
+> <br/>
+> == Packet Headers == <br/>
+> Source: 10.0.9.132<br/>
+> Source Port: Ephemeral  <br/>
+> Destination: 10.1.8.131  <br/>
+> Destination Port: 443/tcp <br/>
 
-Since this is permitted, the traffic is sent to the tgw via intent based routing. Locate the TGW ENI in the same availability zone. 
+The destination is "10.1.8.131" which matches the default route which is pointed at the TGW. However before being allowed to leave the subnet we have to open the Network ACL's outbound rules to check if this packet will be allowed out.
 
-Forward: eni-084d826e4b1e0e190 (HOST-A-VPC-A-1B) -> eni-02632fc1186f1e023 (VPC-A-ATTACH-1B)
+{% include elements/figure.html image="/media/2022-12-15/host-a-subnet-nacl-outbound.png" caption="HOST-A's Network ACL Outbound" %}
 
-<VPC-A-ATTACH-1B-ENI>
+The destination 10.1.8.131 matches the rule for destination 0.0.0.0 with an action of Allow. Therefore the packet is allowed to go to the transit gateway as determined by the Route Table. The traffic is sent to the tgw via intent based routing. 
 
-Note no security group and open it's subnet.
+Let's check out TGW Logic from part 1:
 
-<vpc-a-attach-1b-subnet>
+{% include elements/figure.html image="/media/2022-11-22/tgw-flow.svg" caption="Transit Gateway packet flow logic" %}
 
-Check the network ACL's Inbound rules. No need to to check route table.
+Okay let's confirm if there is a TGW Attachment in the same availability zone.
 
-<vpc-a-attach-1b-nacl-inbound>
+You can the EC2 Console's Network Interface page to locate the Attachment. I've already named mine but you can use the Description and the Availability Zone columns to identify it.
 
-Find the TGW Attachment in VPC-B's 1b AZ and open's it's subnet
+{% include elements/figure.html image="/media/2022-12-15/all-network-interfaces.png" caption="Locating the Attachment in US-EAST-1B" %}
 
-<note-that-the-traffic-crosses-the-tgw>
+Once found click on the ENI ID to open it's page.
 
-<vpc-b-attach-1b-eni>
+{% include elements/figure.html image="/media/2022-12-15/vpc-a-attach-1b-eni.png" caption="VPC-A's Attachment ENI" %}
 
-On the subnet page check the route table.
+Note that there is no security group. Next we should click on it's subnet ID so we may inspect it's Network ACL. There is no need to inspect it's route table as the Transit Gateway attachment will always send traffic incoming traffic to the Transit Gateway regardless of it's route table's configuration.
 
-Forward: eni-084d826e4b1e0e190 (HOST-A-VPC-A-1B) -> eni-02632fc1186f1e023 (VPC-A-ATTACH-1B) -> TGW -> eni-09cd3bddbd4bb7b1b (VPC-B-ATTACH-1B)
+{% include elements/figure.html image="/media/2022-12-15/vpc-a-attach-1b-nacl-inbound.png" caption="VPC-A's Attachment Network ACL" %}
 
-<vpc-b-attach-1b-route-table>
+Since this traffic is incoming to this attachment subnet from HOST-A's subnet we should check the inbound rules. The source IP 10.0.9.132 matches the rule for source 0.0.0.0/0 with an action of allow. Therefore the inbound rule will permit the traffic and we can apply this to our packet walking notes. 
 
-this traffic is destined to "local" which is to an ec2 server outside of this subnet. Confirm the network acl outbound rules.
+> == Packet Path == <br/>
+> Forward: eni-084d826e4b1e0e190 -> **eni-02632fc1186f1e023** -> ? <br/>
+> <br/>
+> == Packet Headers == <br/>
+> Source: 10.0.9.132<br/>
+> Source Port: Ephemeral  <br/>
+> Destination: 10.1.8.131  <br/>
+> Destination Port: 443/tcp <br/>
 
-<vpc-b-attach-1b-nacl-outbound>
+Check the transit gateway's route table to determine where this packet will be sent.
 
-Okay nacl rules allows this traffic. Locate the ENI of the destination EC2 server
+{% include elements/figure.html image="/media/2022-12-15/tgw-route-table.png" caption="Transit Gateway Route Table" %}
 
-Forward: eni-084d826e4b1e0e190 (HOST-A-VPC-A-1B) -> eni-02632fc1186f1e023 (VPC-A-ATTACH-1B) -> TGW -> eni-09cd3bddbd4bb7b1b (VPC-B-ATTACH-1B) -> eni-0092f8e2d29917a4c (HOST-B-VPC-B-1A)
+This route table indicates that it will sent packets destined for the 10.1.0.0/20 network to the attachment ID ending in "05bd" aka the Resource "VPC-B". [The transit gateway is a zonal service](https://docs.aws.amazon.com/vpc/latest/tgw/how-transit-gateways-work.html#tgw-az-overview), it will always by default deliver packets to the same availability zone in which the packet enters from. Since our HOST-A exists in US-EAST-1B availability zone therefore we need to find the TGW Attachment in VPC-B's US-EAST-1B availability zone and open's it's subnet
 
-<locate-ec2-host-b>
+You can the EC2 Console's Network Interface page to locate the Attachment. I've already named mine but you can use the Description and the Availability Zone columns to identify it.
 
-Click on the EC2 Instance ID and then scroll down, open the "Networking Tab" and then open the click the ENI ID Link.
+{% include elements/figure.html image="/media/2022-12-15/all-network-interfaces.png" caption="Locating the Attachment in US-EAST-1B" %}
 
-<host-b-networking-page>
+Click on the VPC-B's Attachment in the US-EAST-1B availability zone to open it's ENI Page.
 
-On the ENI page open both the Subnet ID and the Security Group links.
+{% include elements/figure.html image="/media/2022-12-15/vpc-b-attach-1b-eni.png" caption="VPC-B's Attachment in 1B." %}
 
-<host-b-eni-page>
+Note that there is no security group to check. Next click on the subnet page check the route table. It is necessary to check the route table [because this is traffic coming from the transit gateway](https://docs.aws.amazon.com/vpc/latest/tgw/tgw-nacls.html) rather than traffic going to the transit gateway. Since traffic is not filtered by the Network ACL when coming from the TGW to an Attachment's ENI we can update our packet flow notes.
+
+> == Packet Path == <br/>
+> Forward: eni-084d826e4b1e0e190 -> eni-02632fc1186f1e023 -> **eni-09cd3bddbd4bb7b1b** -> ? <br/>
+> <br/>
+> == Packet Headers == <br/>
+> Source: 10.0.9.132<br/>
+> Source Port: Ephemeral  <br/>
+> Destination: 10.1.8.131  <br/>
+> Destination Port: 443/tcp <br/>
+
+{% include elements/figure.html image="/media/2022-12-15/vpc-b-attach-1b-route-table.png" caption="VPC-B's Attachment Route Table." %}
+
+The route table indicates that this traffic is destined to "local" which is to HOST-B which is outside of this subnet. Let's check it's routing logic that we learned from part 1.
+
+{% include elements/figure.html image="/media/2022-11-22/local-gw-flow.svg" caption="Local packet flow logic" %}
+
+The IP address does exist in this VPC and the ENI is in-use by the HOST-B. Next we need to confirm the TGW Attachment's Network ACL outbound rules because the traffic is leaving the attachment subnet to go to HOST-B's subnet.
+
+{% include elements/figure.html image="/media/2022-12-15/vpc-b-attach-1b-nacl-outbound.png" caption="VPC-B's Attachment Network ACL Outbound." %}
+
+Let's compare our packet walking notes:
+
+> == Packet Path == <br/>
+> Forward: eni-084d826e4b1e0e190 -> eni-02632fc1186f1e023 -> **eni-09cd3bddbd4bb7b1b** -> ? <br/>
+> <br/>
+> == Packet Headers == <br/>
+> Source: 10.0.9.132<br/>
+> Source Port: Ephemeral  <br/>
+> Destination: 10.1.8.131  <br/>
+> Destination Port: 443/tcp <br/>
+
+Okay Network ACL allows this traffic, because "10.1.8.131" matches the rule with Destination 0.0.0.0/0 with an action of Allow. Next we need to confirm that HOST-B's Network ACL will allow this traffic inbound. 
+
+{% include elements/figure.html image="/media/2022-12-15/host-b-subnet-nacl-inbound.png" caption="HOST-B's Network ACL Inbound" %}
+
+The source of the traffic is "10.0.9.132" which matches the source 0.0.0.0/0 with an action of Allow. This means that the traffic is allowed to the ENI of HOST-B. We can locate it's ENI by navigating to the EC2 Console.
+
+{% include elements/figure.html image="/media/2022-12-15/locate-ec2-host-b.png" caption="Locating HOST-B" %}
+
+Click on the HOST-B's Instance ID and then scroll down, open the "Networking Tab" and then open the click the ENI ID Link.
+
+{% include elements/figure.html image="/media/2022-12-15/host-b-networking-page.png" caption="HOST-B's Networking Page" %}
+
+On the ENI page open both the Subnet ID and the Security Group links. We need to confirm that the security group's inbound rules will allow this traffic.
+
+{% include elements/figure.html image="/media/2022-12-15/host-b-eni-page.png" caption="HOST-B's Network Interface" %}
 
 Check the security group to ensure we have an Inbound Rule which allows this traffic.
 
-<host-b-security-group-inbound>
+{% include elements/figure.html image="/media/2022-12-15/host-b-security-group-inbound.png" caption="HOST-B's Security Group Inbound" %}
 
-Check the subnet's route table to see where the next hop is.
+Since the security group has a rule which allows all traffic from all sources then the traffic is received on the OS and the HTTP Service can respond. Let's update our packet walking notes to reflect what we've confirmed.
 
-<host-b-subnet-route-table>
+> == Packet Path == <br/>
+> Forward: eni-084d826e4b1e0e190 -> eni-02632fc1186f1e023 -> eni-09cd3bddbd4bb7b1b -> **eni-0092f8e2d29917a4c** <br/>
+> Return: <br/>
+> <br/>
+> == Packet Headers == <br/>
+> Source: 10.0.9.132<br/>
+> Source Port: Ephemeral  <br/>
+> Destination: 10.1.8.131  <br/>
+> Destination Port: 443/tcp <br/>
 
-Since this is leaving the subnet, check the Network ACL's outbound rules
+Since we reached our destination, this finishes our forward path. Next we will follow the return path. This is connectivity from HOST-B to HOST-A. We will start by checking HOST-B's subnet route table to see where the next hop is. This can be located by first locating Host-B in the EC2 Console.
 
-Forward: eni-084d826e4b1e0e190 (HOST-A-VPC-A-1B) -> eni-02632fc1186f1e023 (VPC-A-ATTACH-1B) -> TGW -> eni-09cd3bddbd4bb7b1b (VPC-B-ATTACH-1B) -> eni-0092f8e2d29917a4c (HOST-B-VPC-B-1A)
-Return: eni-0092f8e2d29917a4c (HOST-B-VPC-B-1A)
+{% include elements/figure.html image="/media/2022-12-15/locate-ec2-host-b.png" caption="HOST-B" %}
 
-<host-b-subnet-nacl-outbound>
+Next lets click on HOST-B's Instance ID and then scroll down to the networking tab/page.
 
-Since this is permitted, the traffic is returned to the tgw via intent based routing. Locate the TGW ENI in the same availability zone as this instance. 
+{% include elements/figure.html image="/media/2022-12-15/host-b-networking-page.png" caption="HOST-B's Networking Page" %}
 
-<vpc-b-attach-1a-eni>
+On this page we can click on the subnet ID to locate it's route table and network acl.
 
-Find the TGW Attachment in VPC-B's 1b AZ and open's it's subnet
+{% include elements/figure.html image="/media/2022-12-15/host-b-subnet-route-table.png" caption="HOST-B's Route Table" %}
 
-<vpc-b-attach-1a-subnet>
+Because our traffic is reversed on the return way we are looking for the route which matches "10.0.9.132".
 
-Check the network ACL's Inbound rules. No need to to check route table.
+> == Packet Path == <br/>
+> Forward: eni-084d826e4b1e0e190 -> eni-02632fc1186f1e023 -> eni-09cd3bddbd4bb7b1b -> eni-0092f8e2d29917a4c <br/>
+> Return: **eni-0092f8e2d29917a4c** -> ?<br/>
+> <br/>
+> == Packet Headers == <br/>
+> Source: 10.1.8.131 <br/>
+> Source Port: Ephemeral  <br/>
+> Destination: 10.0.9.132 <br/>
+> Destination Port: 443/tcp <br/>
 
-<vpc-b-attach-1a-nacl-inbound>
+The only matching route is the default route to the transit gateway. Therefore the traffic is leaving this subnet and Network ACL's outbound rules needs to be checked.
 
-Find the TGW Attachment in VPC-A's 1a AZ and open's it's subnet
+{% include elements/figure.html image="/media/2022-12-15/host-b-subnet-nacl-outbound.png" caption="HOST-B's Network ACL Outbound" %}
 
-<vpc-b-attach-1a-eni-page>
+The destination "10.0.9.132" matches the outbound rule for destination 0.0.0.0/0 with an action of Allow.
 
-Forward: eni-084d826e4b1e0e190 (HOST-A-VPC-A-1B) -> eni-02632fc1186f1e023 (VPC-A-ATTACH-1B) -> TGW -> eni-09cd3bddbd4bb7b1b (VPC-B-ATTACH-1B) -> eni-0092f8e2d29917a4c (HOST-B-VPC-B-1A)
-Return: eni-0092f8e2d29917a4c (HOST-B-VPC-B-1A) -> eni-05888d6f1ed0595bb (VPC-B-ATTACH-1A)
+Next the traffic is returned to the tgw via intent based routing. The transit gateway is a zonal service it will always by default deliver packets to the same availability zone in which the packet enters from. Since our HOST-B exists in US-EAST-1A therefore we need to find the TGW Attachment in VPC-B’s US-EAST-1A availability zone and open’s it’s subnet. Locate the TGW ENI in the same availability zone as this instance. 
 
-<note-that-the-traffic-crosses-the-tgw>
+You can the EC2 Console’s Network Interface page to locate the Attachment. I’ve already named mine but you can use the Description and the Availability Zone columns to identify it.
 
-Locate the ENI for the TGW Attachment in VPC-A for the availability zone 1a.
+{% include elements/figure.html image="/media/2022-12-15/all-network-interfaces.png" caption="Locating VPC-B's Attachment in US-EAST-1A" %}
 
-<vpc-a-attach-1a-eni>
+Now let's click on it's ENI ID.
 
-open the vpc-a-attachment's subnet and network acl
+{% include elements/figure.html image="/media/2022-12-15/vpc-b-attach-1a-eni.png" caption="VPC-B's Attachment's ENI" %}
 
-Forward: eni-084d826e4b1e0e190 (HOST-A-VPC-A-1B) -> eni-02632fc1186f1e023 (VPC-A-ATTACH-1B) -> TGW -> eni-09cd3bddbd4bb7b1b (VPC-B-ATTACH-1B) -> eni-0092f8e2d29917a4c (HOST-B-VPC-B-1A)
-Return: eni-0092f8e2d29917a4c (HOST-B-VPC-B-1A) -> eni-05888d6f1ed0595bb (VPC-B-ATTACH-1A) -> TGW -> eni-062a260949710dda8 (VPC-A-ATTACH-1A)
+Note that there is no security group for us to inspect. Next let's open the subnet to inspect the Network ACL. 
 
-<vpc-a-attach-1a-nacl-outbound>
+{% include elements/figure.html image="/media/2022-12-15/vpc-b-attach-1a-nacl-inbound.png" caption="VPC-B's Attachment's Network ACL Inbound" %}
 
-locate the ENI of the destination EC2 server
+Let's check our packet walking notes:
 
-<vpc-a-attach-1a-route-table>
+> == Packet Path == <br/>
+> Forward: eni-084d826e4b1e0e190 -> eni-02632fc1186f1e023 -> eni-09cd3bddbd4bb7b1b -> eni-0092f8e2d29917a4c <br/>
+> Return: eni-0092f8e2d29917a4c -> **eni-05888d6f1ed0595bb** -> ?<br/>
+> <br/>
+> == Packet Headers == <br/>
+> Source: 10.1.8.131 <br/>
+> Source Port: Ephemeral  <br/>
+> Destination: 10.0.9.132 <br/>
+> Destination Port: 443/tcp <br/>
 
-<locate-ec2-host-a>
+The source "10.1.8.131" matches the source 0.0.0.0/0 rule with an action of Allow. Therefore the packet is received by the ENI and updated in our packet walking notes. The transit gateway is a zonal service it will always by default deliver packets to the same availability zone in which the packet enters from. Since our traffic entered the TGW via US-EAST-1A then it is received on VPC-A's attachment in US-EAST-1A.
 
-Click on the EC2 Instance ID and then scroll down, open the "Networking Tab" and then open the click the ENI ID Link.
+Find the TGW Attachment in VPC-A's US-EAST-1A availability zone and open's it's subnet.
 
-<host-a-networking-page>
+{% include elements/figure.html image="/media/2022-12-15/vpc-a-attach-1a-eni.png" caption="VPC-A's Attachment's ENI" %}
 
-On the ENI page open both the Subnet ID and the Security Group links.
+This is the ENI that receives our traffic from the TGW. Let's update our packet walking notes.
 
-<host-a-eni-page>
+> == Packet Path == <br/>
+> Forward: eni-084d826e4b1e0e190 -> eni-02632fc1186f1e023 -> eni-09cd3bddbd4bb7b1b -> eni-0092f8e2d29917a4c <br/>
+> Return: eni-0092f8e2d29917a4c -> eni-05888d6f1ed0595bb -> eni-062a260949710dda8 <br/>
+> <br/>
+> == Packet Headers == <br/>
+> Source: 10.1.8.131 <br/>
+> Source Port: Ephemeral  <br/>
+> Destination: 10.0.9.132 <br/>
+> Destination Port: 443/tcp <br/>
 
-Host-A's security group should allow the traffic as part of it's stateful inspection. Meaning the same "Outbound" rule allows the traffic to return.
+Now let's open the attachment's route table by navigating to the subnet ID.
 
-Forward: eni-084d826e4b1e0e190 (HOST-A-VPC-A-1B) -> eni-02632fc1186f1e023 (VPC-A-ATTACH-1B) -> TGW -> eni-09cd3bddbd4bb7b1b (VPC-B-ATTACH-1B) -> eni-0092f8e2d29917a4c (HOST-B-VPC-B-1A)
-Return: eni-0092f8e2d29917a4c (HOST-B-VPC-B-1A) -> eni-05888d6f1ed0595bb (VPC-B-ATTACH-1A) -> TGW -> eni-062a260949710dda8 (VPC-A-ATTACH-1A) -> eni-084d826e4b1e0e190 (HOST-A-VPC-A-1B)
+{% include elements/figure.html image="/media/2022-12-15/vpc-a-attach-1a-route-table.png" caption="VPC-A's Attachment's Route Table" %}
 
+The route table indicates that traffic to "10.1.8.131" should be sent to "Local" which means directly to HOST-A's ENI. Next we have to confirm if the attachment's Network ACL will allow this traffic outbound.
 
+> == Packet Path == <br/>
+> Forward: eni-084d826e4b1e0e190 -> eni-02632fc1186f1e023 -> eni-09cd3bddbd4bb7b1b -> eni-0092f8e2d29917a4c <br/>
+> Return: eni-0092f8e2d29917a4c -> eni-05888d6f1ed0595bb -> eni-062a260949710dda8 <br/>
+> <br/>
+> == Packet Headers == <br/>
+> Source: 10.1.8.131 <br/>
+> Source Port: Ephemeral  <br/>
+> Destination: 10.0.9.132 <br/>
+> Destination Port: 443/tcp <br/>
 
+{% include elements/figure.html image="/media/2022-12-15/vpc-a-attach-1a-nacl-outbound.png" caption="VPC-A's Attachment Network ACL Outbound" %}
 
+The destination is "10.0.9.132" which matches the "0.0.0.0/0" rule with an action of Allow. This means that the traffic is allowed to exit the subnet. Now we must confirm if the traffic is permitted inbound to the HOST-A's Subnet via it's Network ACL's inbound rules.
 
-Forward: eni-084d826e4b1e0e190 (HOST-A-VPC-A-1B) -> eni-02632fc1186f1e023 (VPC-A-ATTACH-1B) -> TGW -> eni-09cd3bddbd4bb7b1b (VPC-B-ATTACH-1B) -> eni-0092f8e2d29917a4c (HOST-B-VPC-B-1A)
-Return: eni-0092f8e2d29917a4c (HOST-B-VPC-B-1A) -> eni-05888d6f1ed0595bb (VPC-B-ATTACH-1A) -> TGW -> eni-062a260949710dda8 (VPC-A-ATTACH-1A) -> eni-084d826e4b1e0e190 (HOST-A-VPC-A-1B)
+{% include elements/figure.html image="/media/2022-12-15/host-a-subnet-nacl-inbound.png" caption="HOST-A's Network ACL Inbound" %} 
 
-<!---
+The source IP of the traffic is "10.1.8.131" which matches the "0.0.0.0/0" rule with an action of Allow. This means that the traffic is allowed to enter the subnet. Now that we've confirmed that the traffic is allowed into HOST-A's Subnet then the traffic should be received on the operating system itself.
 
-HTTP Server = HOST-B = i-0705e0c6a791ed085
+There is no need to check the security group because the security group is a stateful inspection service. Meaning the same "Outbound" rule allows the traffic to return. Let's update our Packet Walking notes:
 
-logs filter path taken: logs lost
+> == Packet Path == <br/>
+> Forward: eni-084d826e4b1e0e190 -> eni-02632fc1186f1e023 -> eni-09cd3bddbd4bb7b1b -> eni-0092f8e2d29917a4c <br/>
+> Return: eni-0092f8e2d29917a4c -> eni-05888d6f1ed0595bb -> eni-062a260949710dda8 -> eni-084d826e4b1e0e190 <br/>
+> <br/>
+> == Packet Headers == <br/>
+> Source: 10.1.8.131 <br/>
+> Source Port: Ephemeral  <br/>
+> Destination: 10.0.9.132 <br/>
+> Destination Port: 443/tcp <br/>
 
-fields start as Time, srcAddr as Source, dstAddr as Destination, srcPort as SourcePort, dstPort as DestinationPort, interfaceId as ENI
-| filter SourcePort = '49999' and DestinationPort = '8000' or SourcePort = '8000' and DestinationPort = '49999'
-| sort by Time
+# Bonus Section
 
-eni-02632fc1186f1e023 = VPC-A-ATTACH-1b
-eni-0092f8e2d29917a4c = HOST-B 
-eni-0092f8e2d29917a4c = HOST-B
-eni-062a260949710dda8 = VPC-A-ATTACH-1a
-eni-084d826e4b1e0e190 = HOST-A
-eni-084d826e4b1e0e190 = HOST-A
-eni-05888d6f1ed0595bb = VPC-B-ATTACH-1a
+This is all very theory based and there must be a way to prove the accurancy of the information above. Well, this can all be confirmed via logging of course! VPC Flow Logs can be used to log traffic received at any ENI. However is very important to understand that the VPC Flow Log service is not guarenteed to deliver every log and additionally it is in no way ordered. Let's see this in action, I've confirmed VPC Flow Logging on both VPCs used to create this scenario and both are being logged to the same CloudWatch Log Group.
 
+We can use the following Log Insights query to pull a specific TCP Flow from these logs and structure the output to show each ENI that received these flows.
 
+> fields start as Time, srcAddr as Source, dstAddr as Destination, srcPort as SourcePort, dstPort as DestinationPort, interfaceId as ENI <br/>
+> | filter SourcePort = '49999' and DestinationPort = '8000' or SourcePort = '8000' and DestinationPort = '49999' <br/>
+> | sort by Time <br/>
 
+After plugging the same into the Log Insights page let's see the output.
 
-HTTP Server = HOST-B = i-0705e0c6a791ed085
+{% include elements/figure.html image="/media/2022-12-15/flow-logs-tcp-tuple.png" caption="Log Insights query on VPC Flow Logs" %} 
 
-Forward: eni-084d826e4b1e0e190 (HOST-A-VPC-A-1B) -> eni-02632fc1186f1e023 (VPC-A-ATTACH-1B) -> TGW -> eni-09cd3bddbd4bb7b1b (VPC-B-ATTACH-1B) -> eni-0092f8e2d29917a4c (HOST-B-VPC-B-1A)
-Return: eni-0092f8e2d29917a4c (HOST-B-VPC-B-1A) -> eni-05888d6f1ed0595bb (VPC-B-ATTACH-1A) -> TGW -> eni-062a260949710dda8 (VPC-A-ATTACH-1A) -> eni-084d826e4b1e0e190 (HOST-A-VPC-A-1B)
+Let's check out the first column which is labelled as "Time". Each row contains a value which represents time in Unix Seconds. The VPC Flow Logs documentation indicates that "This might be up to 60 seconds after the packet was transmitted or received on the network interface." So if we copy these out:
 
-What's happening?
+* 1671497064 = 18:44:24 <br/>
+* 1671497072 = 18:44:32 <br/>
+* 1671497072 = 18:44:32 <br/>
+* 1671497078 = 18:44:38 <br/>
+* 1671497083 = 18:44:43 <br/>
+* 1671497088 = 18:44:48 <br/>
+* 1671497092 = 18:44:52 <br/>
+* 1671497092 = 18:44:52 <br/>
 
-The TGW has an AZ Affinity so.
+You can use any tool online just google for "unix seconds converter" to convert these to human-readable format. Just like I did above. This proves that the VPC Flow Logs are not real-time. Next let's copy the order of the ENI column out:
 
-fields start as Time, srcAddr as Source, dstAddr as Destination, srcPort as SourcePort, dstPort as DestinationPort, interfaceId as ENI
-| filter SourcePort = '49997' and DestinationPort = '8000' or SourcePort = '8000' and DestinationPort = '49997'
-| sort by Time
+* eni-02632fc1186f1e023 = VPC-A-ATTACH-1b <br/>
+* eni-0092f8e2d29917a4c = HOST-B  <br/>
+* eni-0092f8e2d29917a4c = HOST-B <br/>
+* eni-062a260949710dda8 = VPC-A-ATTACH-1a <br/>
+* eni-084d826e4b1e0e190 = HOST-A <br/>
+* eni-084d826e4b1e0e190 = HOST-A <br/>
+* eni-05888d6f1ed0595bb = VPC-B-ATTACH-1a <br/>
 
+The order of these ENIs makes no sense from a routing perspective, but can be used to confirm that the packet was indeed received on that ENI. So let's confirm our Forward and Return path with the information above.
 
+**Forward:** eni-084d826e4b1e0e190 -> eni-02632fc1186f1e023 -> eni-09cd3bddbd4bb7b1b -> eni-0092f8e2d29917a4c<br/>
 
+**Return:** eni-0092f8e2d29917a4c -> eni-05888d6f1ed0595bb -> eni-062a260949710dda8 -> eni-084d826e4b1e0e190<br/>
 
+We can see that each occurance exactly matches and only the order is not preserved. Here is a diagram that illustrates our path.
 
-
-
-1. here is the packet walk template
-2. locate the EC2-A server
-3. locate it's private IP to update template
-4. navigate to network interfaces link
-5. locate subnet and security group links.
-6. update template with the name of the ENI-A
-7. check the security group / network acl (outgoing)
-8. check the route table, target is tgw
-9. what availability zone are we in?
-10. locate the transit gateway attachment ENI-A in the same availabilty zone
-11. locate the network acl (incoming & outgoing) of the vpc-a tgw attachment eni subnet
-12. update template
-
-talk about transit gateway az affinity and it's intent based routing behavior
-
-1. locate the tgw route table based on what the source resource is using.
-2. what attachment / resource do we end up at?
-3. locate the eni of the vpc-b attachment in the same az (az affinity reminder)
-4. check the security group / networkacl (incoming & outgoing)
-5 update the template
-
-1. locate the route table of the ENI
-2. check the ENI's route table, target is local
-3. explain local
-4. check network acl (incoming) of subnet for target ec2
-5. check security group of ENI for EC2-B
-6. update the template
-7. This completes our forward path
-
---
-
-starting our return path
-
-1. locate the ec2 server
-2. locate it's eni
-3. check it's route table
-4. check security group and network acl (outgoing)
-5. update template.
-
-1. locate the ENI of the TGW Attachment in the same AZ
-2. check the route table for the ENI of the TGW Attachment in the same AZ 
-3. Check the security group / network acl (incoming & outgoing)
-
-1. Review the TGW's RT
-2. Locate the ENI of the TGW Attachment in the same AZ
-3. Review Network ACL (outgoing)
-
-1. Locate the ENI of the source EC2
-2. Review the network acl (incoming)
+{% include elements/figure.html image="/media/2022-12-15/p3-packet-flow-diagram.svg" caption="Packet Flow Diagram" %} 
 
 # Thanks
 
--->
+I hope you felt that the guided walk-through of this packet walk is useful for you. As you can see the packet walk has a lot of steps but as long as you put one step in front of the other you’ll be fine. Hopefully you'll be able to apply this one day during a troubleshooting scenario and it will save you a lot of time.
