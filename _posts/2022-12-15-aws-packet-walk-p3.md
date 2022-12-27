@@ -10,7 +10,7 @@ description: This post explains how to walk through an VPC to VPC Connectivity s
 
 # Preamble
 
-In this post we are going to explore an AWS Networking Scenario in which an EC2 Instance in a VPC needs to communicate with another EC2 Instance in a different VPC. You've been tagged as the individual responsible for troubleshooting this and you need to apply your Packet Walking skills to understand what, if anything, could be at fault. Below we will first analyize the forward path, stopping at any major decision points and asking ourselfs if the packet will be forwarded or discarded at any point. We will then do the same for the return path. We will use the theory from part 1 to help in this analysis.
+In this post we are going to explore an AWS Networking Scenario in which an [EC2 Instance](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/concepts.html) in a [VPC](https://docs.aws.amazon.com/vpc/latest/userguide/what-is-amazon-vpc.html) needs to communicate with another EC2 Instance in a different VPC. You've been tagged as the individual responsible for troubleshooting this and you need to apply your Packet Walking skills to understand what, if anything, could be at fault. Below we will first analyize the forward path, stopping at any major decision points and asking ourselfs if the packet will be forwarded or discarded at any point. We will then do the same for the return path. We will use the theory from part 1 to help in this analysis.
 
 # Architecture
 
@@ -45,7 +45,7 @@ Click on HOST-A's Instance ID and then scroll down, open the "Networking Tab" an
 
 {% include elements/figure.html image="/media/2022-12-15/host-a-networking-page.png" caption="HOST-A's Networking Page" %}
 
-This ENI represents the first hop for our packet. Let's click on the ENI ID and then open both the Subnet ID and the Security Group links on the next page. Additionally now that we know the first hop let's record it in our packet walking notes.
+This [ENI](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/using-eni.html) represents the first hop for our packet. Let's click on the ENI ID and then open both the Subnet ID and the Security Group links on the next page. Additionally now that we know the first hop let's record it in our packet walking notes.
 
 > == Packet Path == <br/>
 > Forward: **eni-084d826e4b1e0e190** -> ? <br/>
@@ -79,7 +79,7 @@ Let's look back at our packet walking notes.
 > Destination: 10.1.8.131  <br/>
 > Destination Port: 443/tcp <br/>
 
-The destination is "10.1.8.131" which matches the default route which is pointed at the TGW. However before being allowed to leave the subnet we have to open the Network ACL's outbound rules to check if this packet will be allowed out.
+The destination is 10.1.8.131 which matches the default route which is pointed at the [TGW](https://docs.aws.amazon.com/vpc/latest/tgw/what-is-transit-gateway.html). However before being allowed to leave the subnet we have to open the Network ACL's outbound rules to check if this packet will be allowed out.
 
 {% include elements/figure.html image="/media/2022-12-15/host-a-subnet-nacl-outbound.png" caption="HOST-A's Network ACL Outbound" %}
 
@@ -89,7 +89,7 @@ Let's check out TGW Logic from part 1:
 
 {% include elements/figure.html image="/media/2022-11-22/tgw-flow.svg" caption="Transit Gateway packet flow logic" %}
 
-Okay let's confirm if there is a TGW Attachment in the same availability zone.
+Okay let's confirm if there is a TGW Attachment in the same availability zone. This behavior is a key component of Transit Gateway's behavior and is why it's considered a [zonal service](https://docs.aws.amazon.com/vpc/latest/tgw/how-transit-gateways-work.html#tgw-az-overview).
 
 You can the EC2 Console's Network Interface page to locate the Attachment. I've already named mine but you can use the Description and the Availability Zone columns to identify it.
 
@@ -118,7 +118,7 @@ Check the transit gateway's route table to determine where this packet will be s
 
 {% include elements/figure.html image="/media/2022-12-15/tgw-route-table.png" caption="Transit Gateway Route Table" %}
 
-This route table indicates that it will sent packets destined for the 10.1.0.0/20 network to the attachment ID ending in "05bd" aka the Resource "VPC-B". [The transit gateway is a zonal service](https://docs.aws.amazon.com/vpc/latest/tgw/how-transit-gateways-work.html#tgw-az-overview), it will always by default deliver packets to the same availability zone in which the packet enters from. Since our HOST-A exists in US-EAST-1B availability zone therefore we need to find the TGW Attachment in VPC-B's US-EAST-1B availability zone and open's it's subnet
+This route table indicates that it will sent packets destined for the 10.1.0.0/20 network to the attachment ID ending in "05bd" aka the Resource "VPC-B". Remember that [the transit gateway is a zonal service](https://docs.aws.amazon.com/vpc/latest/tgw/how-transit-gateways-work.html#tgw-az-overview), it will always by default deliver packets to the same availability zone in which the packet enters from. Since our HOST-A exists in US-EAST-1B availability zone therefore we need to find the TGW Attachment in VPC-B's US-EAST-1B availability zone and open's it's subnet
 
 You can the EC2 Console's Network Interface page to locate the Attachment. I've already named mine but you can use the Description and the Availability Zone columns to identify it.
 
@@ -327,15 +327,16 @@ Let's check out the first column which is labelled as "Time". Each row contains 
 * 1671497092 = 18:44:52 <br/>
 * 1671497092 = 18:44:52 <br/>
 
-You can use any tool online just google for "unix seconds converter" to convert these to human-readable format. Just like I did above. This proves that the VPC Flow Logs are not real-time. Next let's copy the order of the ENI column out:
+You can use any tool online just google for "[unix seconds converter](https://www.google.com/search?q=unix+seconds+converter&sxsrf=ALiCzsZzEcKB5o2rS6qU_z5MVS_pWcNLgg%3A1672152745414&source=hp&ei=qQarY52oFJWoqtsP2a6iiAY&iflsig=AJiK0e8AAAAAY6sUuWYq48Koo5I9WBhtrOP0G9UdXSDo&ved=0ahUKEwjdoJWzhpr8AhUVlGoFHVmXCGEQ4dUDCAo&uact=5&oq=unix+seconds+converter&gs_lcp=Cgdnd3Mtd2l6EAMyBQgAEIAEMgYIABAWEB4yBggAEBYQHjIGCAAQFhAeMgYIABAWEB4yBQgAEIYDMgUIABCGAzoRCC4QgwEQxwEQsQMQ0QMQgAQ6CwgAEIAEELEDEIMBOhEILhCABBCxAxCDARDHARDRAzoICAAQgAQQsQM6BQguEIAEOg4ILhCABBCxAxDHARDRAzoICC4QgAQQ1AI6CAguEIAEELEDOggILhDUAhCABDoNCAAQFhAeEA8Q8QQQCjoICAAQFhAeEA9QAFiEFGDRFGgAcAB4AIABSogB7QiSAQIyMpgBAKABAQ&sclient=gws-wiz)" to convert these to human-readable format. Just like I did above. This proves that the [VPC Flow Logs are not real-time](https://docs.aws.amazon.com/vpc/latest/userguide/flow-logs.html#:~:text=Flow%20logs%20do%20not%20capture%20real%2Dtime). Next let's copy the order of the ENI column out:
 
 * eni-02632fc1186f1e023 = VPC-A-ATTACH-1b <br/>
 * eni-0092f8e2d29917a4c = HOST-B  <br/>
 * eni-0092f8e2d29917a4c = HOST-B <br/>
+* eni-09cd3bddbd4bb7b1b = VPC-B-ATTACH-1b
+* eni-05888d6f1ed0595bb = VPC-B-ATTACH-1a <br/>
 * eni-062a260949710dda8 = VPC-A-ATTACH-1a <br/>
 * eni-084d826e4b1e0e190 = HOST-A <br/>
 * eni-084d826e4b1e0e190 = HOST-A <br/>
-* eni-05888d6f1ed0595bb = VPC-B-ATTACH-1a <br/>
 
 The order of these ENIs makes no sense from a routing perspective, but can be used to confirm that the packet was indeed received on that ENI. So let's confirm our Forward and Return path with the information above.
 
