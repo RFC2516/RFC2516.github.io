@@ -5,7 +5,7 @@ image: /media/2022-02-11/bgp-lab.jpg
 description: Explore my BGP Lab Project!
 ---
 
-<img src="media/2022-02-11/bgp-lab.jpg">
+<img src="/media/2022-02-11/bgp-lab.jpg">
 
 Photo by <a href="https://unsplash.com/@marekpiwnicki?utm_source=unsplash&utm_medium=referral&utm_content=creditCopyText">Marek Piwnicki</a> on <a href="https://unsplash.com/photos/QajN7imAkyI?utm_source=unsplash&utm_medium=referral&utm_content=creditCopyText">Unsplash</a>
   
